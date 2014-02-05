@@ -1,0 +1,10 @@
+Usage:
+make
+./fsmtest
+
+Should print:
+STATE_Off, setting STATE_On
+STATE_On, setting STATE_Off
+STATE_Off, setting STATE_On
+success
+
