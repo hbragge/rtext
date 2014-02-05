@@ -1,0 +1,17 @@
+#include "fsm.h"
+void sm_trigger() {
+   switch(state) {
+   case STATE_On:
+      if (onoff_pressed == 1) {
+         sm_switch(STATE_Off);
+      }
+      break;
+   case STATE_Off:
+      if (onoff_pressed == 1) {
+         sm_switch(STATE_On);
+      }
+      break;
+   default:
+   break;
+   }
+}
