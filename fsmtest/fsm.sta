@@ -1,0 +1,8 @@
+Statemachine {
+    State On {
+        Transition targetState: /Off, condition: "onoff_pressed == 1"
+    }
+    State Off {
+        Transition targetState: /On, condition: "onoff_pressed == 1"
+    }
+}

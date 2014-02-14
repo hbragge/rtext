@@ -7,8 +7,10 @@ require 'rgen/metamodel_builder'
 require 'rgen/model_builder'
 require 'rgen/environment'
 require 'rgen/instantiator/reference_resolver'
+require 'rgen/fragment/fragmented_model'
 require 'rtext/instantiator'
 require 'rtext/language'
+require 'rtext/default_loader'
 
 class TemplateContainerTest < Test::Unit::TestCase
   
@@ -30,7 +32,12 @@ class TemplateContainerTest < Test::Unit::TestCase
     Statemachine.contains_many 'states', State, 'statemachine'
   end
 
-  def instantiate(text, mm, options={})
+  def test_model
+    tc = RGen::TemplateLanguage::DirectoryTemplateContainer.new(StatemachineMM, OUT_DIR)
+    tc.load(TPL_DIR)
+    File.delete(OUT_DIR+"/fsm.c") if File.exists? OUT_DIR+"/fsm.c"
+
+    mm = StatemachineMM
     env = RGen::Environment.new
     lang = RText::Language.new(mm.ecore, 
       :root_classes => mm.ecore.eAllClasses.select{|c| c.name == "Statemachine" },
@@ -39,41 +46,12 @@ class TemplateContainerTest < Test::Unit::TestCase
       :line_number_attribute => "line_number",
       :fragment_ref_attribute => "fragment_ref"
     )
-    inst = RText::Instantiator.new(lang)
-    problems = []
-    inst.instantiate(text, options.merge({:env => env, :problems => problems, :root_elements => options[:root_elements]}))
-    return env, problems
-  end
 
-  def assert_no_problems(problems)
-    assert problems.empty?, problems.collect{|p| "#{p.message}, line: #{p.line}"}.join("\n")
-  end
+    model = RGen::Fragment::FragmentedModel.new(:env => RGen::Environment.new)
+    loader = RText::DefaultLoader.new(lang, model, :file_provider => lambda { [File.expand_path("fsm.sta")] })
+    loader.load
 
-  def test_model
-    tc = RGen::TemplateLanguage::DirectoryTemplateContainer.new(StatemachineMM, OUT_DIR)
-    tc.load(TPL_DIR)
-    File.delete(OUT_DIR+"/fsm.c") if File.exists? OUT_DIR+"/fsm.c"
-    root_elements = []
-    unresolved_refs = []
-    env, problems = instantiate(%Q(
-      Statemachine {
-          State On {
-            Transition targetState: /Off, condition: "onoff_pressed == 1"
-          }
-          State Off {
-            Transition targetState: /On, condition: "onoff_pressed == 1"
-          }
-      }
-      ), StatemachineMM, :root_elements => root_elements, :unresolved_refs => unresolved_refs)
-
-    # for some reason references are not found automatically
-    resolver = RGen::Instantiator::ReferenceResolver.new
-    resolver.add_identifier("/On", root_elements[0].states[0])
-    resolver.add_identifier("/Off", root_elements[0].states[1])
-    resolver.resolve(unresolved_refs)
-
-    assert_no_problems(problems)
-    tc.expand('root::Root', :for => root_elements)
+    tc.expand('root::Root', :for => model.fragments[0].root_elements)
     result = expected = ""
     File.open(OUT_DIR+"/fsm.c") {|f| result = f.read}
     File.open(OUT_DIR+"/fsm.c.expected") {|f| expected = f.read}
